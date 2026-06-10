@@ -1,0 +1,19 @@
+{
+  "name": "discord-note-bot",
+  "version": "1.0.0",
+  "description": "Discord call notes processor and intern team coordination bot",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "deploy": "node deploy-commands.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.52.0",
+    "discord.js": "^14.16.0",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}
