@@ -21,6 +21,13 @@ async function handleHelp(message) {
         ].join('\n'),
       },
       {
+        name: '📤 EOD Slack Post',
+        value: [
+          `\`${p}eod [extra notes]\` — Generate a Slack end-of-day update from your standup + claims`,
+          `\`${p}dayrecap [extra notes]\` — Alias for \`${p}eod\``,
+        ].join('\n'),
+      },
+      {
         name: '🤝 Coordination Commands',
         value: [
           `\`${p}claim <task>\` — Claim a task you're working on`,

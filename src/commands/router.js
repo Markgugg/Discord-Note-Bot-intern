@@ -3,6 +3,7 @@ const { handleSummarize } = require('./summarize');
 const { handleStart, handleDone, handleCancel } = require('./session');
 const { handleHistory } = require('./history');
 const { handleHelp } = require('./help');
+const { handleEod } = require('./eod');
 const {
   handleClaim,
   handleUnclaim,
@@ -52,6 +53,10 @@ async function handleCommand(message, commandName, args) {
     case 'pass':
       // !pass @user task description
       return handlePass(message, args[0], args.slice(1).join(' '));
+
+    case 'eod':
+    case 'dayrecap':
+      return handleEod(message, args.join(' '));
 
     default:
       // Unknown command — silently ignore
