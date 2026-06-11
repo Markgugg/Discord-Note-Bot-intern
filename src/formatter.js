@@ -1,6 +1,8 @@
 const { EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const { OUTPUT_FORMAT, EMBED_CHAR_LIMIT } = require('../config');
 
+const stripOwner = (s) => s.replace(/\s*\(owner:[^)]*\)/gi, '').trim();
+
 function buildEmbed(summary, metadata = {}) {
   const { author, date } = metadata;
 
@@ -11,14 +13,14 @@ function buildEmbed(summary, metadata = {}) {
     arr && arr.length ? arr.map((i) => `• ${i}`).join('\n') : '_None noted_';
 
   const formatActionItems = (arr) =>
-    arr && arr.length ? arr.map((i) => `- [ ] ${i}`).join('\n') : '_None noted_';
+    arr && arr.length ? arr.map((i) => `- [ ] ${stripOwner(i)}`).join('\n') : '_None noted_';
 
   const embed = new EmbedBuilder()
     .setColor(0x5865f2)
     .setTitle('📋 Call Notes Summary')
     .setTimestamp(date ? new Date(date) : new Date());
 
-  if (author) embed.setFooter({ text: `Summarized from notes by ${author}` });
+  if (author) embed.setFooter({ text: `Summarized by ${author}` });
 
   if (summary.summary) {
     embed.setDescription(truncate(summary.summary, 4096));
@@ -40,40 +42,18 @@ function buildEmbed(summary, metadata = {}) {
   );
 
   if (summary.blockers && summary.blockers.length > 0) {
-    embed.addFields({
-      name: '🚧 Blockers / Issues',
-      value: truncate(formatList(summary.blockers)),
-    });
+    embed.addFields({ name: '🚧 Blockers / Issues', value: truncate(formatList(summary.blockers)) });
   }
 
   if (summary.decisions && summary.decisions.length > 0) {
-    embed.addFields({
-      name: '⚖️ Decisions Made',
-      value: truncate(formatList(summary.decisions)),
-    });
+    embed.addFields({ name: '⚖️ Decisions Made', value: truncate(formatList(summary.decisions)) });
   }
 
   if (summary.nextSteps && summary.nextSteps.length > 0) {
-    embed.addFields({
-      name: '🔜 Next Steps / Follow-up',
-      value: truncate(formatList(summary.nextSteps)),
-    });
+    embed.addFields({ name: '🔜 Next Steps', value: truncate(formatList(summary.nextSteps)) });
   }
 
   return embed;
-}
-
-function buildActionItemsEmbed(actionItems, date) {
-  const checkboxList = actionItems.map((item) => `- [ ] ${item}`).join('\n');
-
-  return new EmbedBuilder()
-    .setColor(0x57f287)
-    .setTitle('☑️ Action Items Checklist')
-    .setDescription(
-      checkboxList.length > 4096 ? checkboxList.slice(0, 4093) + '...' : checkboxList,
-    )
-    .setFooter({ text: 'React with ✅ to mark as reviewed' })
-    .setTimestamp(date ? new Date(date) : new Date());
 }
 
 function summaryToMarkdown(summary, metadata = {}) {
@@ -85,7 +65,7 @@ function summaryToMarkdown(summary, metadata = {}) {
     arr && arr.length ? arr.map((i) => `- ${i}`).join('\n') : '_None noted_';
 
   const formatActionItems = (arr) =>
-    arr && arr.length ? arr.map((i) => `- [ ] ${i}`).join('\n') : '_None noted_';
+    arr && arr.length ? arr.map((i) => `- [ ] ${stripOwner(i)}`).join('\n') : '_None noted_';
 
   return `# Call Notes Summary
 _Generated: ${dateStr}${author ? ` | Submitted by: ${author}` : ''}_
@@ -140,7 +120,6 @@ function shouldUseFile(summary) {
 
 module.exports = {
   buildEmbed,
-  buildActionItemsEmbed,
   buildMarkdownAttachment,
   shouldUseFile,
   summaryToMarkdown,
