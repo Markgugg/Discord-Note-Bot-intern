@@ -33,14 +33,15 @@ Return ONLY valid JSON with exactly these fields:
   "summary": "2-3 sentence overview",
   "participants": "who was involved and what project/context",
   "keyPoints": ["point 1", "point 2"],
-  "actionItems": ["task description (owner: Name or owner unknown)", ...],
+  "actionItems": ["plain task description only — no owner names, no parentheses", ...],
   "blockers": ["blocker 1", ...],
   "decisions": ["decision 1", ...],
   "nextSteps": ["next step 1", ...]
 }
 
 Rules:
-- If no names are mentioned for action items, write "owner unknown"
+- actionItems must be clean task descriptions only — no owner names appended
+- All tasks go into an unclaimed pool; ownership is assigned separately
 - If a section has nothing, use [] or ""
 - keyPoints, actionItems, blockers, decisions, nextSteps must be arrays
 - summary and participants must be strings
@@ -77,14 +78,15 @@ Return ONLY valid JSON with exactly these fields:
   "summary": "2-3 sentence overview",
   "participants": "who was involved and what project/context",
   "keyPoints": ["point 1", "point 2"],
-  "actionItems": ["task description (owner: Name or owner unknown)", ...],
+  "actionItems": ["plain task description only — no owner names, no parentheses", ...],
   "blockers": ["blocker 1", ...],
   "decisions": ["decision 1", ...],
   "nextSteps": ["next step 1", ...]
 }
 
 Rules:
-- If no names are mentioned for action items, write "owner unknown"
+- actionItems must be clean task descriptions only — no owner names appended
+- All tasks go into an unclaimed pool; ownership is assigned separately
 - If a section has nothing, use [] or ""
 - keyPoints, actionItems, blockers, decisions, nextSteps must be arrays
 - summary and participants must be strings

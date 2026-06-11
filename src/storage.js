@@ -39,7 +39,7 @@ function addTasks(descriptions) {
   const data = load();
   const added = descriptions.map((desc) => ({
     id: data.nextTaskId++,
-    description: desc,
+    description: desc.replace(/\s*\(owner:[^)]*\)/gi, '').trim(),
     status: 'unclaimed',   // unclaimed | ongoing | completed
     claimedBy: null,
     claimedUsername: null,
