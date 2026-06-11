@@ -7,7 +7,9 @@ const filePath = path.resolve(STORAGE_FILE);
 function load() {
   try {
     if (!fs.existsSync(filePath)) return defaultData();
-    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    // Merge with defaults so missing fields from old schema don't crash
+    return { ...defaultData(), ...parsed };
   } catch {
     return defaultData();
   }
