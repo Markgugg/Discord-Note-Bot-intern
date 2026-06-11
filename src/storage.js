@@ -1,14 +1,13 @@
 const fs = require('fs');
 const path = require('path');
-const { STORAGE_FILE, HISTORY_LIMIT } = require('../config');
+const { STORAGE_FILE } = require('../config');
 
 const filePath = path.resolve(STORAGE_FILE);
 
 function load() {
   try {
     if (!fs.existsSync(filePath)) return defaultData();
-    const raw = fs.readFileSync(filePath, 'utf8');
-    return JSON.parse(raw);
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
   } catch {
     return defaultData();
   }
@@ -21,23 +20,127 @@ function save(data) {
 }
 
 function defaultData() {
-  return { summaries: {}, actionItems: {}, coordination: { claims: {}, standups: [] } };
+  return {
+    tasks: [],
+    nextTaskId: 1,
+    actionItems: {},
+  };
 }
 
-function getSummaries(channelId) {
-  const data = load();
-  return (data.summaries[channelId] || []).slice(-HISTORY_LIMIT);
+// ── Tasks ──────────────────────────────────────────────────────────────────
+
+function getTasks() {
+  return load().tasks || [];
 }
 
-function addSummary(channelId, summary) {
+function addTasks(descriptions) {
   const data = load();
-  if (!data.summaries[channelId]) data.summaries[channelId] = [];
-  data.summaries[channelId].push({ ...summary, timestamp: Date.now() });
-  if (data.summaries[channelId].length > 50) {
-    data.summaries[channelId] = data.summaries[channelId].slice(-50);
-  }
+  const added = descriptions.map((desc) => ({
+    id: data.nextTaskId++,
+    description: desc,
+    status: 'unclaimed',   // unclaimed | ongoing | completed
+    claimedBy: null,
+    claimedUsername: null,
+    completedBy: null,
+    completedUsername: null,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  }));
+  data.tasks.push(...added);
   save(data);
+  return added;
 }
+
+function claimTask(taskId, userId, username) {
+  const data = load();
+  const task = data.tasks.find((t) => t.id === taskId);
+  if (!task) return null;
+  if (task.status === 'completed') return { error: 'completed' };
+
+  // Release any previous claim by this user
+  data.tasks.forEach((t) => {
+    if (t.claimedBy === userId && t.status === 'ongoing') {
+      t.status = 'unclaimed';
+      t.claimedBy = null;
+      t.claimedUsername = null;
+      t.updatedAt = Date.now();
+    }
+  });
+
+  task.status = 'ongoing';
+  task.claimedBy = userId;
+  task.claimedUsername = username;
+  task.updatedAt = Date.now();
+  save(data);
+  return task;
+}
+
+function freeClaimTask(userId, username, description) {
+  const data = load();
+
+  // Release previous claim
+  data.tasks.forEach((t) => {
+    if (t.claimedBy === userId && t.status === 'ongoing') {
+      t.status = 'unclaimed';
+      t.claimedBy = null;
+      t.claimedUsername = null;
+      t.updatedAt = Date.now();
+    }
+  });
+
+  const task = {
+    id: data.nextTaskId++,
+    description,
+    status: 'ongoing',
+    claimedBy: userId,
+    claimedUsername: username,
+    completedBy: null,
+    completedUsername: null,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+  data.tasks.push(task);
+  save(data);
+  return task;
+}
+
+function unclaimTask(userId) {
+  const data = load();
+  const task = data.tasks.find((t) => t.claimedBy === userId && t.status === 'ongoing');
+  if (!task) return null;
+  task.status = 'unclaimed';
+  task.claimedBy = null;
+  task.claimedUsername = null;
+  task.updatedAt = Date.now();
+  save(data);
+  return task;
+}
+
+function completeTask(userId, username) {
+  const data = load();
+  const task = data.tasks.find((t) => t.claimedBy === userId && t.status === 'ongoing');
+  if (!task) return null;
+  task.status = 'completed';
+  task.completedBy = userId;
+  task.completedUsername = username;
+  task.updatedAt = Date.now();
+  save(data);
+  return task;
+}
+
+function getOngoingTask(userId) {
+  return getTasks().find((t) => t.claimedBy === userId && t.status === 'ongoing') || null;
+}
+
+function getCompletedTasksToday(userId) {
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  return getTasks().filter(
+    (t) => t.completedBy === userId && t.status === 'completed' && t.updatedAt >= startOfDay.getTime(),
+  );
+}
+
+// ── Action item reactions ─────────────────────────────────────────────────
 
 function storeActionItems(messageId, items) {
   const data = load();
@@ -46,8 +149,7 @@ function storeActionItems(messageId, items) {
 }
 
 function getActionItems(messageId) {
-  const data = load();
-  return data.actionItems[messageId] || null;
+  return load().actionItems[messageId] || null;
 }
 
 function markActionItemsReviewed(messageId, userId, username) {
@@ -61,57 +163,16 @@ function markActionItemsReviewed(messageId, userId, username) {
   return record;
 }
 
-function getClaims() {
-  const data = load();
-  return Object.values(data.coordination.claims || {});
-}
-
-function setClaim(userId, username, task) {
-  const data = load();
-  data.coordination.claims[userId] = { userId, username, task, claimedAt: Date.now() };
-  save(data);
-}
-
-function clearClaim(userId) {
-  const data = load();
-  const had = !!data.coordination.claims[userId];
-  delete data.coordination.claims[userId];
-  if (had) save(data);
-  return had;
-}
-
-function addStandup(userId, username, standup) {
-  const data = load();
-  data.coordination.standups.push({ userId, username, ...standup, timestamp: Date.now() });
-  if (data.coordination.standups.length > 200) {
-    data.coordination.standups = data.coordination.standups.slice(-200);
-  }
-  save(data);
-}
-
-function getLatestStandup(userId) {
-  const data = load();
-  const userEntries = (data.coordination.standups || [])
-    .filter((s) => s.userId === userId)
-    .sort((a, b) => b.timestamp - a.timestamp);
-  return userEntries[0] || null;
-}
-
-function getCoordination() {
-  const data = load();
-  return data.coordination;
-}
-
 module.exports = {
-  getSummaries,
-  addSummary,
+  getTasks,
+  addTasks,
+  claimTask,
+  freeClaimTask,
+  unclaimTask,
+  completeTask,
+  getOngoingTask,
+  getCompletedTasksToday,
   storeActionItems,
   getActionItems,
   markActionItemsReviewed,
-  getClaims,
-  setClaim,
-  clearClaim,
-  addStandup,
-  getLatestStandup,
-  getCoordination,
 };

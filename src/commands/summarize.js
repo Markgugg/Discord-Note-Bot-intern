@@ -1,52 +1,52 @@
 const { summarizeNotes } = require('../claude');
-const { addSummary, storeActionItems } = require('../storage');
-const { buildEmbed, buildActionItemsEmbed, buildMarkdownAttachment, shouldUseFile } = require('../formatter');
-const { setPendingCapture } = require('../sessions');
+const { addTasks, storeActionItems } = require('../storage');
+const { buildEmbed, buildMarkdownAttachment, shouldUseFile } = require('../formatter');
+const { buildTaskBoard } = require('./tasks');
+const { EmbedBuilder } = require('discord.js');
 
-async function handleSummarize(message, notes) {
-  if (!notes || !notes.trim()) {
-    setPendingCapture(message.author.id, message.channel.id);
-    return message.reply('📝 Send your notes in the next message and I\'ll summarize them.');
-  }
-  await processSummary(message, notes.trim());
-}
-
-async function processSummary(message, notes) {
-  const thinking = await message.channel.send('⏳ Processing your notes...');
+async function handleSummarize(interaction) {
+  const notes = interaction.options.getString('notes');
+  await interaction.deferReply();
 
   try {
     const summary = await summarizeNotes(notes);
     const metadata = {
-      author: message.author.username,
+      author: interaction.user.username,
       date: new Date().toISOString(),
     };
 
-    addSummary(message.channel.id, { ...summary, ...metadata });
-
-    await thinking.delete();
-
+    // Post summary
     if (shouldUseFile(summary)) {
       const attachment = buildMarkdownAttachment(summary, metadata);
-      await message.reply({
-        content: '📄 Summary is long — here it is as a file:',
-        files: [attachment],
-      });
+      await interaction.editReply({ content: 'Summary is long — here it is as a file:', files: [attachment] });
     } else {
       const embed = buildEmbed(summary, metadata);
-      await message.reply({ embeds: [embed] });
+      await interaction.editReply({ embeds: [embed] });
     }
 
+    // Create tasks from action items and post board
     if (summary.actionItems && summary.actionItems.length > 0) {
-      const actionEmbed = buildActionItemsEmbed(summary.actionItems, metadata.date);
-      const actionMsg = await message.channel.send({ embeds: [actionEmbed] });
-      await actionMsg.react('✅');
-      storeActionItems(actionMsg.id, summary.actionItems);
+      const newTasks = addTasks(summary.actionItems);
+
+      const taskEmbed = new EmbedBuilder()
+        .setColor(0x57f287)
+        .setTitle('Tasks added from these notes')
+        .setDescription(newTasks.map((t) => `\`#${t.id}\` ${t.description}`).join('\n'))
+        .setFooter({ text: 'Use /claim to pick one up' })
+        .setTimestamp();
+
+      const boardEmbed = buildTaskBoard();
+      await interaction.followUp({ embeds: [taskEmbed, boardEmbed] });
+
+      // React tracking on task embed
+      const msg = await interaction.fetchReply();
+      await msg.react('✅').catch(() => {});
+      storeActionItems(msg.id, summary.actionItems);
     }
   } catch (err) {
     console.error('summarize error:', err);
-    await thinking.delete().catch(() => {});
-    await message.reply(`❌ Failed to summarize: ${err.message}`);
+    await interaction.editReply(`Failed to summarize: ${err.message}`);
   }
 }
 
-module.exports = { handleSummarize, processSummary };
+module.exports = { handleSummarize };
